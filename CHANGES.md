@@ -1,3 +1,34 @@
+# 2.1.1
+
+### Improvements
+
+- Added support for `CircuitBreaker.withDelay(DelayFunction)`
+- Added `Fallback.ofException` for returning custom exceptions.
+- Added `ExecutionContext.getLastResult` and `.getLastFailure` to support retries that depend on previous executions
+- Added `CircuitBreakerOpenException.getCircuitBreaker`
+
+### API Changes
+
+- `RetryPolicy.DelayedFunction` was moved to the `net.jodah.failsafe.function` package.
+- Removed `RetryPolicy.canApplyDelayFn`
+
+# 2.1.0
+
+### Improvements
+
+- Added support for `Failsafe.with(List<Policy<R>>)`.
+- Allow `null` `Fallback` values.
+
+### Bug Fixes
+
+- Issue #190 - Failure listener called on success for async executions.
+- Issue #191 - Add missing listeners to RetryPolicy copy constructor.
+- Issue #192 - Problem with detecting completion when performing async execution.
+
+### Behavior Changes
+
+- A [standalone](https://github.com/jhalterman/failsafe#execution-tracking) or [async execution](https://github.com/jhalterman/failsafe#asynchronous-api-integration) will only be marked as complete when all policies are complete. `Execution.isComplete` reflects this. 
+
 # 2.0.1
 
 ### Improvements

@@ -33,9 +33,7 @@ public abstract class AbstractExecution extends ExecutionContext {
   final List<PolicyExecutor<Policy<Object>>> policyExecutors;
 
   // Internally mutable state
-  volatile Object lastResult;
-  volatile Throwable lastFailure;
-
+  volatile boolean resultHandled;
   /** The wait time in nanoseconds. */
   private volatile long waitNanos;
   volatile boolean completed;
@@ -59,12 +57,13 @@ public abstract class AbstractExecution extends ExecutionContext {
    */
   void record(ExecutionResult result) {
     Assert.state(!completed, "Execution has already been completed");
-    attempts++;
+    attempts.incrementAndGet();
     lastResult = result.getResult();
     lastFailure = result.getFailure();
   }
 
   void preExecute() {
+    resultHandled = false;
   }
 
   /**
@@ -74,28 +73,15 @@ public abstract class AbstractExecution extends ExecutionContext {
    */
   synchronized boolean postExecute(ExecutionResult result) {
     record(result);
-    for (PolicyExecutor<Policy<Object>> policyExecutor : policyExecutors)
+    boolean allComplete = true;
+    for (PolicyExecutor<Policy<Object>> policyExecutor : policyExecutors) {
       result = policyExecutor.postExecute(result);
+      allComplete = allComplete && result.isComplete();
+    }
 
     waitNanos = result.getWaitNanos();
-    completed = result.isComplete();
+    completed = allComplete;
     return completed;
-  }
-
-  /**
-   * Returns the last failure that was recorded.
-   */
-  @SuppressWarnings("unchecked")
-  public <T extends Throwable> T getLastFailure() {
-    return (T) lastFailure;
-  }
-
-  /**
-   * Returns the last result that was recorded.
-   */
-  @SuppressWarnings("unchecked")
-  public <T> T getLastResult() {
-    return (T) lastResult;
   }
 
   /**
@@ -107,7 +93,8 @@ public abstract class AbstractExecution extends ExecutionContext {
   }
 
   /**
-   * Returns whether the execution is complete or if it can be retried.
+   * Returns whether the execution is complete or if it can be retried. An execution is considered complete only when
+   * all configured policies consider the execution complete.
    */
   public boolean isComplete() {
     return completed;

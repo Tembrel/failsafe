@@ -17,9 +17,13 @@ package net.jodah.failsafe;
 
 import net.jodah.failsafe.function.CheckedRunnable;
 import net.jodah.failsafe.function.CheckedSupplier;
+import net.jodah.failsafe.internal.CircuitBreakerInternals;
 import net.jodah.failsafe.internal.CircuitState;
 
 import java.lang.reflect.Field;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class Testing {
@@ -80,10 +84,32 @@ public class Testing {
     }
   }
 
+  public static CompletableFuture<Object> futureResult(ScheduledExecutorService executor, Object result) {
+    CompletableFuture<Object> future = new CompletableFuture<>();
+    executor.schedule(() -> future.complete(result), 0, TimeUnit.MILLISECONDS);
+    return future;
+  }
+
+  public static CompletableFuture<Object> futureException(ScheduledExecutorService executor, Exception exception) {
+    CompletableFuture<Object> future = new CompletableFuture<>();
+    executor.schedule(() -> future.completeExceptionally(exception), 0, TimeUnit.MILLISECONDS);
+    return future;
+  }
+
   public static void sleep(long duration) {
     try {
       Thread.sleep(duration);
     } catch (InterruptedException ignore) {
+    }
+  }
+
+  public static CircuitBreakerInternals getInternals(CircuitBreaker circuitBreaker) {
+    try {
+      Field internalsField = CircuitBreaker.class.getDeclaredField("internals");
+      internalsField.setAccessible(true);
+      return (CircuitBreakerInternals) internalsField.get(circuitBreaker);
+    } catch (Exception e) {
+      return null;
     }
   }
 }

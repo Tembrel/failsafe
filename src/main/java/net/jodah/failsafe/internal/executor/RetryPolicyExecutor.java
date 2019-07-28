@@ -16,7 +16,6 @@
 package net.jodah.failsafe.internal.executor;
 
 import net.jodah.failsafe.*;
-import net.jodah.failsafe.RetryPolicy.DelayFunction;
 import net.jodah.failsafe.internal.EventListener;
 import net.jodah.failsafe.util.concurrent.Scheduler;
 
@@ -42,8 +41,6 @@ public class RetryPolicyExecutor extends PolicyExecutor<RetryPolicy> {
   private volatile boolean retriesExceeded;
   /** The fixed, backoff, random or computed delay time in nanoseconds. */
   private volatile long delayNanos = -1;
-  /** The wait time, which is the delay time adjusted for jitter and max duration, in nanoseconds. */
-  private volatile long waitNanos;
 
   // Listeners
   private EventListener abortListener;
@@ -148,16 +145,10 @@ public class RetryPolicyExecutor extends PolicyExecutor<RetryPolicy> {
     failedAttempts++;
 
     // Determine the computed delay
-    long computedDelayNanos = -1;
-    DelayFunction<Object, Throwable> delayFunction = (DelayFunction<Object, Throwable>) policy.getDelayFn();
-    if (delayFunction != null && policy.canApplyDelayFn(result.getResult(), result.getFailure())) {
-      Duration computedDelay = delayFunction.computeDelay(result.getResult(), result.getFailure(), execution);
-      if (computedDelay != null && computedDelay.toNanos() >= 0)
-        computedDelayNanos = computedDelay.toNanos();
-    }
+    Duration computedDelay = policy.computeDelay(result, execution);
 
     // Determine the non-computed delay
-    if (computedDelayNanos == -1) {
+    if (computedDelay == null) {
       Duration delay = policy.getDelay();
       Duration delayMin = policy.getDelayMin();
       Duration delayMax = policy.getDelayMax();
@@ -172,7 +163,8 @@ public class RetryPolicyExecutor extends PolicyExecutor<RetryPolicy> {
         delayNanos = (long) Math.min(delayNanos * policy.getDelayFactor(), policy.getMaxDelay().toNanos());
     }
 
-    waitNanos = computedDelayNanos != -1 ? computedDelayNanos : delayNanos;
+    // The wait time, which is the delay time adjusted for jitter and max duration, in nanoseconds
+    long waitNanos = computedDelay != null ? computedDelay.toNanos() : delayNanos;
 
     // Adjust the wait time for jitter
     if (policy.getJitter() != null)
